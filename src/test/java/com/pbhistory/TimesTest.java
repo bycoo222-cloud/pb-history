@@ -30,7 +30,10 @@ import java.util.List;
 import java.util.Map;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class TimesTest
@@ -166,5 +169,192 @@ public class TimesTest
 		assertEquals(94, b.get(0).average(0), 1e-9);
 		assertEquals("nightmare", b.get(1).key);
 		assertEquals(0, b.get(1).bestAt());                 // no date
+	}
+
+	@Test
+	public void pbPictureMatchesTheKillThatSetIt()
+	{
+		java.time.ZoneId z = java.time.ZoneId.of("America/New_York");
+		// the user's real CoX CM PB (11-07 22:33:29.809, kc 4) and RuneLite's screenshot of that raid
+		Pictures.Shot shot = Pictures.bossShot("/s/bycoo222/Boss Kills/Chambers of Xeric Challenge Mode(4) 2026-11-07_22-33-42.png", z);
+		assertNotNull(shot);
+		assertEquals("chambers of xeric challenge mode", shot.boss);
+		assertEquals(4, shot.kc);
+		Entry mode = Entry.pb("chambers of xeric challenge mode", 2614, 2702, 1794108809809L, 4, true);
+		Entry size = Entry.pb("chambers of xeric challenge mode 3 players", 2614, 2702, 1794108809812L, 4, true);
+		assertTrue(Pictures.sameKill(shot, mode));
+		assertTrue(Pictures.sameKill(shot, size));
+		assertFalse(Pictures.sameKill(shot, Entry.pb("chambers of xeric", 1800, 1900, 1794108809809L, 4, true)));    // regular CoX
+		assertFalse(Pictures.sameKill(shot, Entry.pb("chambers of xeric challenge mode", 2614, 2702, 1794108809809L, 5, true))); // another kill
+		assertFalse(Pictures.sameKill(shot, Entry.pb("chambers of xeric challenge mode", 2614, 2702, 1794108809809L - 3_600_000L, 4, true)));
+		assertNull(Pictures.bossShot("/s/bycoo222/Deaths/Death 2026-11-07_22-29-19.png", z));
+		assertEquals("theatre of blood hard mode", Pictures.norm("Theatre of Blood: Hard Mode"));
+	}
+
+	@Test
+	public void livePictureFromTheGameEvent()
+	{
+		// the CM raid: its count message, then the reward chest opens 13 s later and RuneLite takes the picture
+		ShotNamer n = new ShotNamer(new ShotNamerTest.Fake().with("boss", true));
+		n.chat("Your completed Chambers of Xeric Challenge Mode count is: <col=ff0000>4</col>.", 1794108809000L, true, true, false, 1, false);
+		n.widget(net.runelite.api.gameval.InterfaceID.RAIDS_REWARDS, 1794108822000L);
+		ShotNamer.Name name = n.take(1794108822400L);
+		assertEquals(ShotNamer.BOSS_KILLS, name.type);
+		Pictures.Shot shot = Pictures.named(name.file, name.at);
+		assertNotNull(shot);
+		assertEquals("chambers of xeric challenge mode", shot.boss);
+		assertEquals(4, shot.kc);
+		assertTrue(Pictures.sameKill(shot, Entry.pb("chambers of xeric challenge mode 3 players", 2614, 2702, 1794108809812L, 4, true)));
+		// a boss kill from its kill-count message
+		n.chat("Your Vorkath kill count is: <col=ff0000>852</col>.", 2_000_000L, true, true, false, 1, false);
+		Pictures.Shot vork = Pictures.named(n.take(2_000_300L).file, 2_000_000L);
+		assertTrue(Pictures.sameKill(vork, Entry.pb("vorkath", 85.8, 90.0, 1_999_999L, 852, true)));
+		assertNull(Pictures.named("Death", 1L));
+		assertNull(Pictures.named("", 1L));
+	}
+
+	@Test
+	public void importMatchesOldScreenshotsToRecordedPbs()
+	{
+		java.time.ZoneId z = java.time.ZoneId.of("America/New_York");
+		Map<String, Pictures.Shot> shots = new java.util.LinkedHashMap<>();
+		for (String f : new String[]{
+			"Chambers of Xeric Challenge Mode(4) 2026-11-07_22-33-42.png",   // the kill that set the CM PB
+			"Chambers of Xeric Challenge Mode(3) 2026-11-06_21-10-00.png",   // an earlier raid: not a PB
+			"Vorkath(850) 2026-11-07_20-00-05.png"})                         // no Vorkath PB recorded that day
+		{
+			shots.put(f, Pictures.bossShot("Boss Kills/" + f, z));
+		}
+		List<Entry> lines = Arrays.asList(
+			Entry.pb("chambers of xeric challenge mode", 2614, 2702, 1794108809809L, 4, true),
+			Entry.pb("chambers of xeric challenge mode 3 players", 2614, 2702, 1794108809812L, 4, true),
+			Entry.kill("chambers of xeric challenge mode 3 players", 2614, 1794108810425L, 4),
+			Entry.pb("vorkath", 85.8, 90.0, 0, 0, false));                  // from before PB History: no time to match
+		Map<Long, String> got = Pictures.match(lines, shots, new java.util.HashSet<>());
+		assertEquals(2, got.size());                                         // a raid's PB is saved twice: both get it
+		assertEquals("Chambers of Xeric Challenge Mode(4) 2026-11-07_22-33-42.png", got.get(1794108809809L));
+		assertEquals("Chambers of Xeric Challenge Mode(4) 2026-11-07_22-33-42.png", got.get(1794108809812L));
+		// a PB that already has its picture is left alone
+		assertEquals(1, Pictures.match(lines, shots, new java.util.HashSet<>(Arrays.asList(1794108809809L))).size());
+	}
+
+	@Test
+	public void consistency()
+	{
+		History.Boss b = new History.Boss("vorkath");
+		for (double t : new double[]{120, 125, 140, 160, 118})
+		{
+			b.kills.add(Entry.kill("vorkath", t, 1, 0));
+		}
+		assertEquals(118, b.best(), 1e-9);
+		assertEquals(2, b.within(0.05));      // within 5% of 118 = up to 123.9: 118 and 120 (125 is not)
+		assertEquals(125, b.median(), 1e-9);
+	}
+
+	@Test
+	public void roomMessages()
+	{
+		// the game's own messages, as in the Plugin Hub's Raid Data Tracker tests
+		Object[] cox = Rooms.parse("Combat room 'Vanguards' complete! Duration: 3:19 Total: 16:16");
+		assertEquals("Vanguards", cox[0]);
+		assertEquals(199.0, (double) cox[1], 1e-9);
+		Object[] tob = Rooms.parse("Wave 'The Final Challenge' (Normal Mode) complete!<br>Duration: <col=ff0000>5:47.40</col><br>Theatre of Blood completion time: <col=ff0000>21:49.80</col> (new personal best)");
+		assertEquals("The Final Challenge", tob[0]);
+		assertEquals(347.4, (double) tob[1], 1e-9);
+		Object[] toa = Rooms.parse("Challenge complete: Path of Crondis. Duration: 0:34.20. Total: 0:34.20");
+		assertEquals("Path of Crondis", toa[0]);
+		assertEquals(34.2, (double) toa[1], 1e-9);
+		Object[] wardens = Rooms.parse("Challenge complete: The Wardens. Duration: 10:15.60Tombs of Amascut: Expert Mode challenge completion time: 34:07.20. Personal best: 28:16.20");
+		assertEquals("The Wardens", wardens[0]);
+		assertEquals(615.6, (double) wardens[1], 1e-9);
+		assertNull(Rooms.parse("Middle level complete! Duration: 7:53 Total: 20:50"));   // a floor, not a room
+		assertNull(Rooms.parse("Congratulations - your raid is complete!"));
+		assertEquals("tombs of amascut expert mode", Rooms.mode("tombs of amascut expert mode 3 players"));
+		assertEquals("chambers of xeric challenge mode", Rooms.mode("chambers of xeric challenge mode solo"));
+		assertEquals("chambers of xeric", Rooms.mode("chambers of xeric 11-15 players"));
+		assertEquals("theatre of blood hard mode", Rooms.mode("theatre of blood hard mode 4 players"));
+		assertEquals("Verzik", Rooms.label("The Final Challenge"));
+
+		// rooms are filed under the mode, and never become a boss of their own
+		List<Entry> lines = new java.util.ArrayList<>();
+		lines.add(Entry.pb("theatre of blood 4 players", 1500, 0, 10, 1, true));
+		lines.add(Entry.room("theatre of blood", "Xarpus", 120, 9, 1));
+		List<History.Boss> bosses = History.build(lines, new HashMap<>(), new HashMap<>());
+		assertEquals(1, bosses.size());
+		assertEquals(1, bosses.get(0).rooms.size());
+		assertEquals(0, bosses.get(0).kills.size());
+	}
+
+	/**
+	 * The Theatre of Blood's and the Tombs of Amascut's last room message carries the raid's own time AFTER the room's
+	 * "Duration:" — the raid's kill time is the raid's, never the last room's. Messages as in RuneLite's
+	 * ChatCommandsPluginTest (testTheatreOfBlood, testTheatreOfBloodNoPb, testToA*, testTheFracturedArchive).
+	 */
+	@Test
+	public void raidKillTimeIsTheRaidsNotTheLastRooms()
+	{
+		assertArrayEquals(new double[]{1020.2, 1}, Times.duration("Wave 'The Final Challenge' (Normal Mode) complete!<br>"
+			+ "Duration: <col=ff0000>2:42.0</col><br>Theatre of Blood completion time: <col=ff0000>17:00.20</col> (new personal best)"), 1e-9);
+		assertArrayEquals(new double[]{1020, 0}, Times.duration("Wave 'The Final Challenge' (Normal Mode) complete!<br>"
+			+ "Duration: <col=ff0000>2:42</col><br>Theatre of Blood completion time: <col=ff0000>17:00</col>. Personal best: 13:52.80"), 1e-9);
+		assertArrayEquals(new double[]{511, 1}, Times.duration("Challenge complete: The Wardens. Duration: <col=ef1020>8:30</col><br>"
+			+ "Tombs of Amascut challenge completion time: <col=ef1020>8:31</col> (new personal best)"), 1e-9);
+		assertArrayEquals(new double[]{580, 0}, Times.duration("Challenge complete: The Wardens. Duration: <col=ef1020>9:40</col><br>"
+			+ "Tombs of Amascut: Expert Mode challenge completion time: <col=ef1020>9:40</col>. Personal best: 8:31"), 1e-9);
+		// the "total completion time" that follows is not the kill time (RuneLite's PB is the completion time) ...
+		assertNull(Times.duration("Theatre of Blood total completion time: <col=ff0000>24:40.20</col>. Personal best: 20:45.00"));
+		// ... but it is how long the raid took, for which rooms are this raid's
+		assertEquals(1480.2, Times.total("Theatre of Blood total completion time: <col=ff0000>24:40.20</col>. Personal best: 20:45.00"), 1e-9);
+		assertEquals(0, Times.total("Your Vorkath kill count is: <col=ff0000>851</col>."), 1e-9);
+		// unchanged: the Fractured Archive's own total, and a raid of the Chambers of Xeric
+		assertArrayEquals(new double[]{145.8, 1}, Times.duration("The Fractured Archive: Total completion time: <col=ef1020>2:25.80</col> "
+			+ "(new personal best)"), 1e-9);
+		assertArrayEquals(new double[]{2470, 0}, Times.duration("<col=ef20ff>Congratulations - your raid is complete!</col><br>Team size: "
+			+ "<col=ff0000>3 players</col> Duration:</col> <col=ff0000>41:10</col> Personal best: </col><col=ff0000>40:03</col>"), 1e-9);
+	}
+
+	/** The Chambers of Xeric's rooms as CoX Additions' "CoX Timers" writes them (backticks; dey0/pluginhub-plugins). */
+	@Test
+	public void coxTimersRoomMessages()
+	{
+		Object[] tekton = Rooms.parse("Combat room `Tekton` complete! Duration: <col=ff0000>2:43</col> Total: <col=ff0000>6:53</col>");
+		assertEquals("Tekton", tekton[0]);
+		assertEquals(163.0, (double) tekton[1], 1e-9);
+		assertEquals(Rooms.COX, tekton[2]);
+		Object[] crabs = Rooms.parse("Puzzle `Crabs` complete! Duration: <col=ff0000>1:10.20</col> Total: <col=ff0000>9:00</col>");
+		assertEquals("Crabs", crabs[0]);
+		assertEquals(70.2, (double) crabs[1], 1e-9);
+		Object[] ice = Rooms.parse("Puzzle `Ice demon` complete! Duration: <col=ff0000>3:01</col> Total: <col=ff0000>12:00</col>");
+		assertEquals("Ice demon", ice[0]);
+		assertEquals(Rooms.TOB, Rooms.parse("Wave 'Xarpus' (Hard Mode) complete!<br>Duration: <col=ff0000>2:00</col>")[2]);
+		assertEquals(Rooms.TOA, Rooms.parse("Challenge complete: Path of Het. Duration: <col=ef1020>3:00</col>. Total: <col=ef1020>9:00</col>")[2]);
+		assertNull(Rooms.parse("Olm phase 1 duration: <col=ff0000>1:12</col>"));
+		assertEquals(Rooms.TOB, Rooms.raid("theatre of blood hard mode 4 players"));
+		assertEquals(Rooms.TOA, Rooms.raid("tombs of amascut expert mode"));
+		assertEquals(Rooms.COX, Rooms.raid("chambers of xeric challenge mode 3 players"));
+		assertNull(Rooms.raid("vorkath"));
+	}
+
+	/** A raid's rooms: only its own raid, only since it began, the latest of each — a left raid never leaks into the next. */
+	@Test
+	public void roomsOfThisRaidOnly()
+	{
+		long now = 10_000_000L;
+		List<Object[]> seen = new java.util.ArrayList<>();
+		seen.add(new Object[]{"The Maiden of Sugadinti", 150.0, now - 3_000_000L, Rooms.TOB});   // a ToB left at Verzik, 50 min ago
+		seen.add(new Object[]{"Xarpus", 200.0, now - 2_500_000L, Rooms.TOB});
+		seen.add(new Object[]{"Path of Het", 90.0, now - 1_500_000L, Rooms.TOA});                // a ToA room since
+		seen.add(new Object[]{"The Maiden of Sugadinti", 140.0, now - 1_000_000L, Rooms.TOB});   // the finished ToB
+		seen.add(new Object[]{"The Final Challenge", 300.0, now, Rooms.TOB});
+		List<Object[]> mine = Rooms.ofThisRaid(seen, Rooms.TOB, now, 1_480.2 + 120);
+		assertEquals(2, mine.size());
+		assertEquals("The Maiden of Sugadinti", mine.get(0)[0]);
+		assertEquals(140.0, (double) mine.get(0)[1], 1e-9);       // this raid's, not the left one's
+		assertEquals("The Final Challenge", mine.get(1)[0]);
+		assertEquals(0, Rooms.ofThisRaid(seen, null, now, 1e9).size());
+		// a wider window takes the left raid's Xarpus, but still each room once and never the ToA's
+		List<Object[]> wide = Rooms.ofThisRaid(seen, Rooms.TOB, now, 4_000);
+		assertEquals(3, wide.size());
+		assertEquals(140.0, (double) wide.get(0)[1], 1e-9);
 	}
 }

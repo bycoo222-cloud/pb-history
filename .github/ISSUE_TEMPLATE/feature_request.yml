@@ -1,0 +1,11 @@
+name: An idea or a request
+description: Something you'd like PB History to do, for example a PB or kill time missing, a raid room time that looks off
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What you'd like, and what it would help you with.
+    validations:
+      required: true

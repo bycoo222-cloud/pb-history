@@ -43,10 +43,23 @@ final class Times
 	private static final Pattern RAID = Pattern.compile("Duration:</col> <col=ff0000>(?<time>[0-9:]+(?:\\.[0-9]+)?)</col>"
 		+ "(?<fresh> \\(new personal best\\))?");
 
+	/**
+	 * the raid's own time in the Theatre of Blood's and the Tombs of Amascut's LAST room message, which starts with that
+	 * room's "Duration:" — "Wave 'The Final Challenge' (Normal Mode) complete!&lt;br&gt;Duration: 2:42&lt;br&gt;Theatre of Blood
+	 * completion time: 17:00.20 (new personal best)" — so it is read before KILL (RuneLite's ChatCommandsPluginTest
+	 * testTheatreOfBlood / testToA*). Never the "total completion time" (the waits between rooms included), the same as
+	 * RuneLite's own PB.
+	 */
+	private static final Pattern COMPLETION = Pattern.compile("(?i)(?<!total )completion time: (?:<col=[0-9a-f]{6}>|@.+?@)"
+		+ "(?<time>[0-9:]+(?:\\.[0-9]+)?)</col>(?<fresh> \\(new personal best\\))?");
+	/** "Theatre of Blood total completion time: 24:40.20. Personal best: 20:45.00" — the raid from its first room to its end */
+	private static final Pattern TOTAL = Pattern.compile("(?i)total completion time: (?:<col=[0-9a-f]{6}>|@.+?@)"
+		+ "(?<time>[0-9:]+(?:\\.[0-9]+)?)</col>");
+
 	/** {seconds, 1 if the game said new personal best} or null */
 	static double[] duration(String message)
 	{
-		for (Pattern p : new Pattern[]{RAID, KILL})
+		for (Pattern p : new Pattern[]{RAID, COMPLETION, KILL})
 		{
 			Matcher m = p.matcher(message);
 			if (m.find())
@@ -59,6 +72,13 @@ final class Times
 			}
 		}
 		return null;
+	}
+
+	/** A raid's "total completion time" in seconds (Theatre of Blood, Tombs of Amascut); 0 = not one. */
+	static double total(String message)
+	{
+		Matcher m = message == null ? null : TOTAL.matcher(message);
+		return m != null && m.find() ? parse(m.group("time")) : 0;
 	}
 
 	/** "1:23.40" → 83.4, "1:02:03" → 3723, "45.6" → 45.6; 0 if it can't be read */

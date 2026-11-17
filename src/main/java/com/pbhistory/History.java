@@ -26,6 +26,7 @@ package com.pbhistory;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,8 @@ final class History
 		final List<Entry> pbs = new ArrayList<>();
 		/** timed kills, oldest first */
 		final List<Entry> kills = new ArrayList<>();
+		/** a raid's room times (all team sizes of its mode), oldest first */
+		final List<Entry> rooms = new ArrayList<>();
 		int kc;
 
 		Boss(String key)
@@ -100,6 +103,37 @@ final class History
 				}
 			}
 			return out;
+		}
+
+		/** the middle timed kill (half were faster, half slower); NaN = no timed kills */
+		double median()
+		{
+			if (kills.isEmpty())
+			{
+				return Double.NaN;
+			}
+			double[] t = new double[kills.size()];
+			for (int i = 0; i < t.length; i++)
+			{
+				t[i] = kills.get(i).secs;
+			}
+			java.util.Arrays.sort(t);
+			return t.length % 2 == 1 ? t[t.length / 2] : (t[t.length / 2 - 1] + t[t.length / 2]) / 2;
+		}
+
+		/**
+		 * How many timed kills were within {@code pct} of the PB (0.05 = 5%): how often you play at your PB's pace
+		 * (user 2026-11-08 on consistency: "i want that a lot").
+		 */
+		int within(double pct)
+		{
+			double best = best();
+			int n = 0;
+			for (Entry e : kills)
+			{
+				n += best > 0 && e.secs <= best * (1 + pct) + 1e-9 ? 1 : 0;
+			}
+			return n;
 		}
 
 		/** when the PB now was set; 0 = before PB History */
@@ -276,10 +310,16 @@ final class History
 	static List<Boss> build(List<Entry> lines, Map<String, Double> stored, Map<String, Integer> kcs)
 	{
 		Map<String, Boss> by = new LinkedHashMap<>();
+		Map<String, List<Entry>> rooms = new HashMap<>();
 		for (Entry e : lines)
 		{
 			if (e.boss == null || e.secs <= 0)
 			{
+				continue;
+			}
+			if (e.isRoom())
+			{
+				rooms.computeIfAbsent(e.boss, k -> new ArrayList<>()).add(e);   // never a boss of its own
 				continue;
 			}
 			Boss b = by.computeIfAbsent(e.boss, Boss::new);
@@ -306,6 +346,12 @@ final class History
 		{
 			b.pbs.sort(Comparator.comparingLong(e -> e.at));
 			b.kills.sort(Comparator.comparingLong(e -> e.at));
+			List<Entry> r = rooms.get(Rooms.mode(b.key));
+			if (r != null)
+			{
+				b.rooms.addAll(r);
+				b.rooms.sort(Comparator.comparingLong(e -> e.at));
+			}
 			Integer kc = kcs.get(b.key);
 			b.kc = kc != null ? kc : 0;
 			for (Entry e : b.kills)

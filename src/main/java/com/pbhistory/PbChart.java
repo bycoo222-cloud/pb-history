@@ -48,7 +48,6 @@ import net.runelite.client.ui.FontManager;
  */
 final class PbChart extends JPanel
 {
-	static final Color PB = ColorScheme.BRAND_ORANGE;
 	private static final Color KILL = new Color(150, 150, 150);
 	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.ENGLISH);
 	private static final int L = 50, R = 8, T = 8, B = 18;
@@ -67,6 +66,8 @@ final class PbChart extends JPanel
 		}
 	}
 
+	/** The theme (PbPanel's): the chart's card, its PB line and its labels. */
+	private Looks look = Looks.of(Looks.Id.PLAIN);
 	private final List<Point> points = new ArrayList<>();
 	private final History.Boss boss;
 	private double lo, hi;
@@ -109,6 +110,13 @@ final class PbChart extends JPanel
 		hi = hi + pad;
 	}
 
+	/** Draws in {@code t} (the panel's theme). */
+	void theme(Looks t)
+	{
+		look = t;
+		setBackground(t.card);
+	}
+
 	private double x(int i)
 	{
 		int n = points.size();
@@ -131,7 +139,7 @@ final class PbChart extends JPanel
 		g.setColor(new Color(255, 255, 255, 25));
 		g.drawLine(L, (int) y(hi - (hi - lo) * 0.08), getWidth() - R, (int) y(hi - (hi - lo) * 0.08));
 		g.drawLine(L, (int) y(lo + (hi - lo) * 0.08), getWidth() - R, (int) y(lo + (hi - lo) * 0.08));
-		g.setColor(ColorScheme.LIGHT_GRAY_COLOR);
+		g.setColor(look.dim);
 		drawRight(g, Times.format(Math.round(hi - (hi - lo) * 0.08)), L - 4, (int) y(hi - (hi - lo) * 0.08) + 4);
 		drawRight(g, Times.format(Math.round(lo + (hi - lo) * 0.08)), L - 4, (int) y(lo + (hi - lo) * 0.08) + 4);
 		if (points.isEmpty())
@@ -157,7 +165,7 @@ final class PbChart extends JPanel
 		{
 			line.lineTo(getWidth() - R, y(points.get(0).best));
 		}
-		g.setColor(PB);
+		g.setColor(look.highlight);
 		g.setStroke(new BasicStroke(2f));
 		g.draw(line);
 		// the kills, then the new PBs on top
@@ -166,7 +174,7 @@ final class PbChart extends JPanel
 			Point p = points.get(i);
 			if (!p.e.isPb())
 			{
-				g.setColor(KILL);
+				g.setColor(look.id == Looks.Id.PLAIN ? KILL : look.dim);
 				fillDot(g, x(i), y(p.e.secs), 4);
 			}
 		}
@@ -175,13 +183,13 @@ final class PbChart extends JPanel
 			Point p = points.get(i);
 			if (p.step)
 			{
-				g.setColor(ColorScheme.DARKER_GRAY_COLOR);
+				g.setColor(look.card);
 				fillDot(g, x(i), y(p.e.secs), 9);
-				g.setColor(PB);
+				g.setColor(look.highlight);
 				fillDot(g, x(i), y(p.e.secs), 7);
 			}
 		}
-		g.setColor(ColorScheme.LIGHT_GRAY_COLOR);
+		g.setColor(look.dim);
 		g.drawString(kills == 1 ? "1 timed kill" : kills + " timed kills", L, getHeight() - 4);
 	}
 

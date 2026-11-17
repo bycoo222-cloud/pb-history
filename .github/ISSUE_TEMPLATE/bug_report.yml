@@ -1,0 +1,21 @@
+name: Something's wrong
+description: PB History did something it shouldn't, or didn't do something it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what PB History showed, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: picture
+    attributes:
+      label: A screenshot
+      description: If you can, drag a screenshot of the panel or the game in here.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: From RuneLite's Plugin Hub list, if you know it.

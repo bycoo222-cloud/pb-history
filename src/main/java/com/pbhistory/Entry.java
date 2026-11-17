@@ -32,6 +32,8 @@ final class Entry
 {
 	static final String KILL = "kill";
 	static final String PB = "pb";
+	/** one room of a raid: its time, filed under the raid's mode (the room messages don't say the team size) */
+	static final String ROOM = "room";
 
 	String kind;
 	/** RuneLite's own name for it, lower case, e.g. "vorkath", "tombs of amascut expert mode 2 players" */
@@ -46,6 +48,8 @@ final class Entry
 	int kc;
 	/** a PB the game called "new personal best" (not one RuneLite only learned of, like on a first kill after installing) */
 	boolean fresh;
+	/** a room: its name as the game says it ("Tekton", "The Maiden of Sugadinti", "Path of Crondis") */
+	String room;
 
 	static Entry kill(String boss, double secs, long at, int kc)
 	{
@@ -69,6 +73,23 @@ final class Entry
 		e.kc = kc;
 		e.fresh = fresh;
 		return e;
+	}
+
+	static Entry room(String raidMode, String room, double secs, long at, int kc)
+	{
+		Entry e = new Entry();
+		e.kind = ROOM;
+		e.boss = raidMode;
+		e.room = room;
+		e.secs = secs;
+		e.at = at;
+		e.kc = kc;
+		return e;
+	}
+
+	boolean isRoom()
+	{
+		return ROOM.equals(kind);
 	}
 
 	boolean isPb()
