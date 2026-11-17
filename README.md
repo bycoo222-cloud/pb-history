@@ -12,14 +12,15 @@ and challenge.
   green − is a new PB by that much, a red + is how much slower it was.
 - **Tabs** for Bosses, Raids, Challenges (the Inferno, the Fight Caves, the Colosseum...) and everything else. The
   Raids tab splits the Chambers of Xeric, the Theatre of Blood and the Tombs of Amascut into their modes and team
-  sizes.
+  sizes, and has a tab for **The Fractured Archive** (one PB for every team size, as RuneLite's `!pb` keeps it).
 - **Click a boss** for its graph: every timed kill as a dot, your PB as a line stepping down, and a mark where each
   new PB was set. Below it: your average and your last-10 average, and every PB you set with its date and kill count.
 - **Goal times.** Set a goal on a boss's page: a bar shows how close your PB is, and a chat line says *goal reached!*
   on the kill that beats it.
 - **How consistent you are**: how many of your kills came within 5% of your PB, and your typical kill.
 - **Raid rooms**: each room's best and last time, from the game's own room messages (in the Chambers of Xeric, from the
-  CoX Timers in the *CoX Additions* plugin, as the game itself only times each floor). In the Theatre of Blood and the
+  CoX Timers in the *CoX Additions* plugin, as the game itself only times each floor; in The Fractured Archive, in the
+  order of its stages). In the Theatre of Blood and the
   Tombs of Amascut, your **sum of best** too: your best time in every room added up, and how far it is from your PB —
   time you've already shown you can save.
 - **Your PBs from before you installed it** are there from the start (without a date), so it isn't empty.

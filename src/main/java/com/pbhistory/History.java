@@ -185,7 +185,8 @@ final class History
 	static String tab(String key)
 	{
 		String k = key.toLowerCase(java.util.Locale.ROOT);
-		if (k.startsWith("chambers of xeric") || k.startsWith("theatre of blood") || k.startsWith("tombs of amascut"))
+		if (k.startsWith("chambers of xeric") || k.startsWith("theatre of blood") || k.startsWith("tombs of amascut")
+			|| k.startsWith("fractured archive") || k.startsWith("the fractured archive"))
 		{
 			return RAIDS;
 		}
@@ -210,11 +211,15 @@ final class History
 
 	// ---- raids: which raid, which mode, which team size (user, 2026-11-07: "sub tabs for raids ... for toa so its entry
 	// normal hard and then do team size, for cox do callenge mode and regular ... we got to make that look neater") ----
-	static final String[] RAID_PREFIX = {"chambers of xeric", "theatre of blood", "tombs of amascut"};
-	static final String[] RAID_SHORT = {"CoX", "ToB", "ToA"};
-	static final String[] RAID_LONG = {"Chambers of Xeric", "Theatre of Blood", "Tombs of Amascut"};
+	// The Fractured Archive (user 2026-11-16: "Its got to track tfa too don't forget the new raid"): RuneLite saves ONE PB for
+	// it, "fractured archive", for every team size (ChatCommandsPlugin, "chat commands: add tfa", 2026-10-18)
+	static final String[] RAID_PREFIX = {"chambers of xeric", "theatre of blood", "tombs of amascut", "fractured archive"};
+	static final String[] RAID_SHORT = {"CoX", "ToB", "ToA", "TFA"};
+	static final String[] RAID_LONG = {"Chambers of Xeric", "Theatre of Blood", "Tombs of Amascut", "The Fractured Archive"};
+	/** the index of The Fractured Archive in the lists above */
+	static final int TFA = 3;
 	/** each raid's modes in the order they're shown ("" = its normal mode) */
-	static final String[][] RAID_MODES = {{"", "challenge mode"}, {"entry mode", "", "hard mode"}, {"entry mode", "", "expert mode"}};
+	static final String[][] RAID_MODES = {{"", "challenge mode"}, {"entry mode", "", "hard mode"}, {"entry mode", "", "expert mode"}, {""}};
 	private static final java.util.regex.Pattern SIZE = java.util.regex.Pattern.compile("(?:^|\\s)(solo|\\d+ players?)$");
 
 	/** A raid PB's parts, from RuneLite's name: "tombs of amascut expert mode 2 players" → ToA, "expert mode", "2 players". */
@@ -238,6 +243,10 @@ final class History
 	static Raid raid(String key)
 	{
 		String k = key.toLowerCase(java.util.Locale.ROOT).trim();
+		if (k.startsWith("the fractured archive"))
+		{
+			k = k.substring(4);
+		}
 		for (int i = 0; i < RAID_PREFIX.length; i++)
 		{
 			if (!k.startsWith(RAID_PREFIX[i]))
@@ -262,7 +271,7 @@ final class History
 		switch (mode)
 		{
 			case "":
-				return raid == 0 ? "Regular" : "Normal";
+				return raid == 0 ? "Regular" : raid == TFA ? sizeName("") : "Normal";   // TFA: one PB, every team size
 			case "entry mode":
 				return "Entry";
 			case "expert mode":

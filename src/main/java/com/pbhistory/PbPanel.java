@@ -1074,6 +1074,27 @@ final class PbPanel extends PluginPanel
 			double[] t = by.get(e.room);
 			by.put(e.room, t == null ? new double[]{e.secs, e.secs} : new double[]{Math.min(t[0], e.secs), e.secs});
 		}
+		List<String> order = Rooms.order(b.key);
+		if (fixed == null && order != null)
+		{
+			// The Fractured Archive: the rooms you've done, in stage order (one of two rooms at stages 2-4), then any other
+			java.util.Map<String, double[]> sorted = new java.util.LinkedHashMap<>();
+			for (String r : order)
+			{
+				for (java.util.Map.Entry<String, double[]> x : by.entrySet())
+				{
+					if (x.getKey().equalsIgnoreCase(r))
+					{
+						sorted.put(x.getKey(), x.getValue());
+					}
+				}
+			}
+			for (java.util.Map.Entry<String, double[]> x : by.entrySet())
+			{
+				sorted.putIfAbsent(x.getKey(), x.getValue());
+			}
+			by = sorted;
+		}
 		body.add(Box.createVerticalStrut(10));
 		JLabel h = new JLabel("Rooms");
 		h.setFont(FontManager.getRunescapeBoldFont());

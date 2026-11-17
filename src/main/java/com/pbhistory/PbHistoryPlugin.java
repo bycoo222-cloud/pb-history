@@ -804,7 +804,7 @@ public class PbHistoryPlugin extends Plugin implements PbPanel.Backend
 	/** What's new after an update, shown until closed (change BOTH with each update worth telling). */
 	static final String WHATS_NEW_ID = "2026-11-goals";
 	static final String WHATS_NEW = "New: each PB's kill screenshot; goal times, consistency and raid room times (open "
-		+ "a boss); themes in the settings.";
+		+ "a boss); The Fractured Archive on the Raids tab; themes in the settings.";
 
 	@Override
 	public String whatsNew()

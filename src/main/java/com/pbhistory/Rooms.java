@@ -57,13 +57,28 @@ final class Rooms
 	static final String TOB = "tob";
 	static final String TOA = "toa";
 	static final String COX = "cox";
+	static final String TFA = "tfa";
+	/**
+	 * A "Challenge complete: &lt;room&gt;. Duration:" line whose room is on neither list below: the Tombs of Amascut and The
+	 * Fractured Archive word their room lines the same, so it counts for whichever of the two ends next (the raid's
+	 * time window keeps another raid's rooms out).
+	 */
+	static final String CHALLENGE = "challenge";
 	/** The Theatre of Blood's waves and the Tombs of Amascut's challenges: always the same rooms, so their best times add up. */
 	static final List<String> TOB_ROOMS = Arrays.asList("The Maiden of Sugadinti", "The Pestilent Bloat", "The Nylocas", "Sotetseg",
 		"Xarpus", "The Final Challenge");
 	static final List<String> TOA_ROOMS = Arrays.asList("Path of Scabaras", "Kephri", "Path of Het", "Akkha", "Path of Crondis", "Zebak",
 		"Path of Apmeken", "Ba-Ba", "The Wardens");
+	/**
+	 * The Fractured Archive's rooms in stage order: the Archive Guardian, then one of two rooms at each of stages 2-4,
+	 * then Ocellus. MEASURED from eight real raids' messages (the TFA Splits Tracker plugin's recorded-raids.json):
+	 * Archive Guardian, Bork, Dreadnoth the Jellied, Xarth, Ocellus. Ezekiel, Moia and Dagon'hai Trio are that plugin's
+	 * names for the other three (its TfaRoom), not seen in a message; a room not on this list still counts (CHALLENGE).
+	 */
+	static final List<String> TFA_ROOMS = Arrays.asList("Archive Guardian", "Ezekiel", "Bork", "Moia", "Dreadnoth the Jellied",
+		"Dagon'hai Trio", "Xarth", "Ocellus");
 	private static final Map<String, String> SHORT = Map.of("The Maiden of Sugadinti", "Maiden", "The Pestilent Bloat", "Bloat",
-		"The Nylocas", "Nylocas", "The Final Challenge", "Verzik");
+		"The Nylocas", "Nylocas", "The Final Challenge", "Verzik", "Dreadnoth the Jellied", "Dreadnoth");
 
 	private Rooms()
 	{
@@ -85,18 +100,37 @@ final class Rooms
 			if (m.find())
 			{
 				double secs = Times.parse(m.group("d"));
-				return secs > 0 ? new Object[]{m.group("room").trim(), secs, raids[i]} : null;
+				String room = m.group("room").replace('\u2019', '\'').trim();
+				String raid = raids[i];
+				if (TOA.equals(raid))
+				{
+					raid = has(TFA_ROOMS, room) ? TFA : has(TOA_ROOMS, room) ? TOA : CHALLENGE;
+				}
+				return secs > 0 ? new Object[]{room, secs, raid} : null;
 			}
 		}
 		return null;
 	}
 
-	/** The raid a boss key is (TOB / TOA / COX); null = not a raid. */
+	private static boolean has(List<String> rooms, String room)
+	{
+		for (String r : rooms)
+		{
+			if (r.equalsIgnoreCase(room))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** The raid a boss key is (TOB / TOA / COX / TFA); null = not a raid. */
 	static String raid(String key)
 	{
 		String k = key == null ? "" : key;
 		return k.startsWith("theatre of blood") ? TOB : k.startsWith("tombs of amascut") ? TOA
-			: k.startsWith("chambers of xeric") ? COX : null;
+			: k.startsWith("chambers of xeric") ? COX : k.startsWith("fractured archive") || k.startsWith("the fractured archive")
+			? TFA : null;
 	}
 
 	/**
@@ -109,7 +143,8 @@ final class Rooms
 		Map<String, Object[]> latest = new LinkedHashMap<>();
 		for (Object[] r : seen)
 		{
-			if (raid == null || r.length < 4 || !raid.equals(r[3]) || now - (long) r[2] > windowSecs * 1000)
+			boolean either = CHALLENGE.equals(r.length < 4 ? null : r[3]) && (TOA.equals(raid) || TFA.equals(raid));
+			if (raid == null || r.length < 4 || !(raid.equals(r[3]) || either) || now - (long) r[2] > windowSecs * 1000)
 			{
 				continue;
 			}
@@ -128,11 +163,19 @@ final class Rooms
 		return key == null ? null : key.replaceFirst(" (?:solo|\\d+\\+? players?|\\d+-\\d+ players)$", "");
 	}
 
-	/** The fixed rooms of this raid (Theatre of Blood, Tombs of Amascut); null = rooms that change each raid (Chambers of Xeric). */
+	/** The fixed rooms of this raid (Theatre of Blood, Tombs of Amascut); null = rooms that change each raid (Chambers of Xeric, The
+	 * Fractured Archive). */
 	static List<String> fixed(String key)
 	{
 		String k = key == null ? "" : key;
 		return k.startsWith("theatre of blood") ? TOB_ROOMS : k.startsWith("tombs of amascut") ? TOA_ROOMS : null;
+	}
+
+	/** The order a raid's rooms are listed in: its fixed rooms, or The Fractured Archive's stages; null = as they came. */
+	static List<String> order(String key)
+	{
+		List<String> f = fixed(key);
+		return f != null ? f : TFA.equals(raid(key)) ? TFA_ROOMS : null;
 	}
 
 	/** A room's name in a table: "Maiden", "Verzik"; anything else as the game says it. */

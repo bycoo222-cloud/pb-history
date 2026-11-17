@@ -357,4 +357,139 @@ public class TimesTest
 		assertEquals(3, wide.size());
 		assertEquals(140.0, (double) wide.get(0)[1], 1e-9);
 	}
+
+	// ---- The Fractured Archive (user 2026-11-16: "Its got to track tfa too don't forget the new raid") ----
+	// Real game messages, unaltered and in their order, from two of the eight raids in the TFA Splits Tracker plugin's
+	// recorded-raids.json (github.com/LogicalSoIutions/tfa-splits-tracker, BSD-2-Clause; no player names in them).
+
+	/** 3 players, 28:04.80 */
+	private static final String[] TFA_PB_RAID = {
+		"Challenge started: Archive Guardian.",
+		"Challenge complete: Archive Guardian. Duration: <col=ef1020>2:09.60</col>. Total: <col=ef1020>2:09.60</col>. Personal best: 1:54.60",
+		"Challenge started: Bork.",
+		"Challenge complete: Bork. Duration: <col=ef1020>2:51.60</col>. Total: <col=ef1020>5:15.60</col>. Personal best: 2:35.40",
+		"Challenge started: Dreadnoth the Jellied.",
+		"Challenge complete: Dreadnoth the Jellied. Duration: <col=ef1020>2:47.40</col>. Total: <col=ef1020>8:28.20</col>. Personal best: 2:29.40",
+		"Challenge started: Xarth.",
+		"Challenge complete: Xarth. Duration: <col=ef1020>3:32.40</col>. Total: <col=ef1020>13:12.60</col>. Personal best: 2:25.80",
+		"1/3 party members are now ready.",
+		"2/3 party members are now ready.",
+		"Challenge started: Ocellus.",
+		"Challenge complete: Ocellus. Duration: <col=ef1020>13:58.20</col>. Total: <col=ef1020>28:04.80</col> (new personal best)",
+		"The Fractured Archive: Total completion time: <col=ef1020>28:04.80</col> (new personal best)"
+	};
+
+	/** 4 players, 24:42.60 */
+	private static final String[] TFA_NO_PB_RAID = {
+		"Challenge started: Archive Guardian.",
+		"Challenge complete: Archive Guardian. Duration: <col=ef1020>2:17.40</col>. Total: <col=ef1020>2:17.40</col>. Personal best: 1:43.80",
+		"Challenge started: Bork.",
+		"Challenge complete: Bork. Duration: <col=ef1020>2:07.80</col>. Total: <col=ef1020>4:38.40</col> (new personal best)",
+		"Challenge started: Dreadnoth the Jellied.",
+		"Challenge complete: Dreadnoth the Jellied. Duration: <col=ef1020>2:18.00</col>. Total: <col=ef1020>7:16.80</col>. Personal best: 2:06.00",
+		"Challenge started: Xarth.",
+		"Challenge complete: Xarth. Duration: <col=ef1020>2:15.00</col>. Total: <col=ef1020>10:32.40</col>. Personal best: 2:03.00",
+		"1/4 party members are now ready.",
+		"2/4 party members are now ready.",
+		"3/4 party members are now ready.",
+		"Challenge started: Ocellus.",
+		"Challenge complete: Ocellus. Duration: <col=ef1020>9:39.60</col>. Total: <col=ef1020>24:42.60</col> (new personal best)",
+		"The Fractured Archive: Total completion time: <col=ef1020>24:42.60</col>. Personal best: 23:04.20"
+	};
+
+	@Test
+	public void fracturedArchiveIsARaid()
+	{
+		assertEquals(History.RAIDS, History.tab("fractured archive"));    // RuneLite's key (ChatCommandsPluginTest)
+		History.Raid r = History.raid("fractured archive");
+		assertNotNull(r);
+		assertEquals(History.TFA, r.raid);
+		assertEquals("", r.mode);
+		assertEquals("", r.size);
+		assertEquals("TFA", History.RAID_SHORT[r.raid]);
+		assertEquals("Best at any size", History.modeName(r.raid, r.mode));   // one PB for every team size
+		assertEquals(History.TFA, History.raid("the fractured archive").raid);
+		assertEquals(Rooms.TFA, Rooms.raid("fractured archive"));
+		assertNull(Rooms.fixed("fractured archive"));                       // its rooms change: no sum of best
+		assertEquals(Rooms.TFA_ROOMS, Rooms.order("fractured archive"));
+		// its icon, found by the hiscore's display name: the constant is FRACTURED_ARCHIVE in RuneLite 1.13.6 and
+		// THE_FRACTURED_ARCHIVE in RuneLite's newer code, the name "The Fractured Archive" in both
+		net.runelite.client.hiscore.HiscoreSkill icon = PbHistoryPlugin.hiscoreFor("fractured archive");
+		assertNotNull(icon);
+		assertEquals("fractured archive", PbHistoryPlugin.norm(icon.getName()));
+		// the other raids as before
+		assertEquals(2, History.raid("tombs of amascut expert mode 2 players").raid);
+		assertEquals("Normal", History.modeName(2, ""));
+		assertEquals("Regular", History.modeName(0, ""));
+	}
+
+	/** The time the plugin keeps for a kill: the LAST one read before the kill count is saved (onChatMessage). */
+	private static double[] lastTime(String[] messages)
+	{
+		double[] last = null;
+		for (String m : messages)
+		{
+			double[] d = Times.duration(m);
+			if (d != null)
+			{
+				last = d;
+			}
+		}
+		return last;
+	}
+
+	@Test
+	public void fracturedArchiveKillTimeIsTheRaidsNotOcellus()
+	{
+		// a PB raid: 28:04.80, not Ocellus's 13:58.20
+		assertArrayEquals(new double[]{28 * 60 + 4.8, 1}, lastTime(TFA_PB_RAID), 0.001);
+		// not a PB: 24:42.60 and NOT fresh, although Ocellus's own line says "(new personal best)" (that is the room's)
+		assertArrayEquals(new double[]{24 * 60 + 42.6, 0}, lastTime(TFA_NO_PB_RAID), 0.001);
+		// the raid's total, which sets how far back its rooms are looked for
+		assertEquals(28 * 60 + 4.8, Times.total(TFA_PB_RAID[TFA_PB_RAID.length - 1]), 0.001);
+	}
+
+	@Test
+	public void fracturedArchiveRooms()
+	{
+		List<Object[]> seen = new java.util.ArrayList<>();
+		long t = 1_000_000L;
+		for (String m : TFA_NO_PB_RAID)
+		{
+			Object[] r = Rooms.parse(m);
+			if (r != null)
+			{
+				seen.add(new Object[]{r[0], r[1], t += 1000, r[2]});
+			}
+		}
+		String[] names = {"Archive Guardian", "Bork", "Dreadnoth the Jellied", "Xarth", "Ocellus"};
+		double[] secs = {137.4, 127.8, 138.0, 135.0, 579.6};
+		assertEquals(names.length, seen.size());
+		for (int i = 0; i < names.length; i++)
+		{
+			assertEquals(names[i], seen.get(i)[0]);
+			assertEquals(secs[i], (double) seen.get(i)[1], 0.001);
+			assertEquals(Rooms.TFA, seen.get(i)[3]);
+		}
+		// a ToA room is still a ToA room (RuneLite's ToA message), and a room on neither list counts for either raid
+		Object[] wardens = Rooms.parse("Challenge complete: The Wardens. Duration: <col=ef1020>8:30</col><br>Tombs of Amascut "
+			+ "challenge completion time: <col=ef1020>8:31</col> (new personal best)");
+		assertEquals("The Wardens", wardens[0]);
+		assertEquals(Rooms.TOA, wardens[2]);
+		Object[] unknown = Rooms.parse("Challenge complete: A New Room. Duration: <col=ef1020>2:00.00</col>. Total: "
+			+ "<col=ef1020>6:00.00</col>");
+		assertEquals(Rooms.CHALLENGE, unknown[2]);
+		seen.add(new Object[]{unknown[0], unknown[1], t += 1000, unknown[2]});
+		seen.add(new Object[]{wardens[0], wardens[1], t += 1000, wardens[2]});
+		assertEquals(6, Rooms.ofThisRaid(seen, Rooms.TFA, t, 1600).size());   // the five + the unknown one, never the Wardens
+		assertEquals(2, Rooms.ofThisRaid(seen, Rooms.TOA, t, 1600).size());   // the Wardens + the unknown one
+		assertEquals(0, Rooms.ofThisRaid(seen, Rooms.TOB, t, 1600).size());
+		// the game's curly apostrophe; short names in the table
+		Object[] trio = Rooms.parse("Challenge complete: Dagon\u2019hai Trio. Duration: <col=ef1020>3:00.00</col>. Total: "
+			+ "<col=ef1020>9:00.00</col>");
+		assertEquals("Dagon'hai Trio", trio[0]);
+		assertEquals(Rooms.TFA, trio[2]);
+		assertEquals("Dreadnoth", Rooms.label("Dreadnoth the Jellied"));
+		assertEquals("Ocellus", Rooms.label("Ocellus"));
+	}
 }
