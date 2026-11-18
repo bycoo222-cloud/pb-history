@@ -119,6 +119,12 @@ final class PbPanel extends PluginPanel
 		default void importPictures(java.awt.Component parent)
 		{
 		}
+
+		/** show the Combat Achievement speed tasks (the "Speed tasks" setting) */
+		default boolean speedTasks()
+		{
+			return true;
+		}
 	}
 
 	private Backend backend;
@@ -677,8 +683,46 @@ final class PbPanel extends PluginPanel
 		// the room the name really has: the row less its padding (8), the icon (16 + 6) and the Last / PB columns (108 + 6)
 		// (lines broken here by measuring with the real font: Swing's HTML width hint clipped instead of wrapping)
 		JLabel name = small("", look.text);
-		name.setText(wrapped(name, label, WIDTH - 8 - (withIcon ? 22 : 0) - 114 - 4));
-		r.add(name, BorderLayout.CENTER);
+		int room = WIDTH - 8 - (withIcon ? 22 : 0) - 114 - 4;
+		// the speed-task badge after the name: the hardest Combat Achievement tier the PB beats (hollow = none yet). The
+		// name's room is ~57 px and a one-word name up to 52 (MEASURED in RuneLite's small font), so the badge goes after
+		// the name's last line when it fits there, else on a line of its own under the name
+		List<SpeedTasks.Task> tasks = speedTasksOn() ? SpeedTasks.of(b.key) : java.util.Collections.emptyList();
+		javax.swing.Icon badge = SpeedTasks.badge(tasks, b.best());
+		if (badge == null)
+		{
+			name.setText(wrapped(name, label, room));
+			r.add(name, BorderLayout.CENTER);
+		}
+		else
+		{
+			java.awt.FontMetrics fm = name.getFontMetrics(name.getFont());
+			JPanel box = new JPanel();
+			box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
+			box.setOpaque(false);
+			List<String> ls = lines(fm, label, room);
+			JLabel lastLine = null;
+			for (String s : ls)
+			{
+				lastLine = small(s, look.text);
+				box.add(lastLine);
+			}
+			// room + 4: the name's real width (the wrap leaves 4 px spare), so "Vorkath M" and "Zulrah GM" stay on one line
+			if (fm.stringWidth(ls.get(ls.size() - 1)) + 4 + badge.getIconWidth() <= room + 4)
+			{
+				lastLine.setIcon(badge);
+				lastLine.setHorizontalTextPosition(SwingConstants.LEADING);
+				lastLine.setIconTextGap(4);
+			}
+			else
+			{
+				JLabel own = new JLabel(badge);
+				own.setAlignmentX(LEFT_ALIGNMENT);
+				own.setBorder(new EmptyBorder(2, 0, 1, 0));
+				box.add(own);
+			}
+			r.add(box, BorderLayout.CENTER);
+		}
 		double d = lastDelta(b);
 		JLabel gl = small(Double.isNaN(d) ? "" : delta(d), Double.isNaN(d) ? look.text : d < -1e-9 ? new Color(0x4FD16A)
 			: d > 1e-9 ? new Color(0xE0, 0x56, 0x4A) : look.dim);
@@ -691,7 +735,7 @@ final class PbPanel extends PluginPanel
 		r.setToolTipText("<html>" + b.name + ": <b>" + b.time(b.best()) + "</b> - " + (at == 0 ? "set before PB History" : "set " + day(at))
 			+ (b.kc > 0 ? " · kc " + b.kc : "") + (Double.isNaN(d) ? "" : "<br>last kill " + b.time(b.kills.get(b.kills.size() - 1).secs)
 			+ (d < -1e-9 ? " - a new PB by " + delta(-d).substring(1) : d > 1e-9 ? " - " + delta(d) + " over your PB" : " - tied your PB"))
-			+ "</html>");
+			+ (badge == null ? "" : "<br>" + speedLine(tasks, b.best())) + "</html>");
 		r.setMaximumSize(new Dimension(WIDTH, r.getPreferredSize().height));
 		clickable(r, b.key, look.hover);
 		return r;
@@ -753,9 +797,17 @@ final class PbPanel extends PluginPanel
 	static String wrapped(JLabel l, String text, int max)
 	{
 		java.awt.FontMetrics fm = l.getFontMetrics(l.getFont());
+		return fm.stringWidth(text) <= max ? text : "<html>" + String.join("<br>", lines(fm, text, max)) + "</html>";
+	}
+
+	/** {@code text} broken into lines no wider than {@code max} px (a word wider than that keeps its own line) */
+	static List<String> lines(java.awt.FontMetrics fm, String text, int max)
+	{
+		List<String> out = new ArrayList<>();
 		if (fm.stringWidth(text) <= max)
 		{
-			return text;
+			out.add(text);
+			return out;
 		}
 		List<String> parts = new ArrayList<>();
 		java.util.regex.Matcher m = java.util.regex.Pattern.compile("[^ -]+-?|\\s+").matcher(text);
@@ -763,18 +815,18 @@ final class PbPanel extends PluginPanel
 		{
 			parts.add(m.group());
 		}
-		StringBuilder out = new StringBuilder("<html>");
 		StringBuilder line = new StringBuilder();
 		for (String part : parts)
 		{
 			if (line.length() > 0 && fm.stringWidth((line + part).trim()) > max)
 			{
-				out.append(line.toString().trim()).append("<br>");
+				out.add(line.toString().trim());
 				line.setLength(0);
 			}
 			line.append(part);
 		}
-		return out.append(line.toString().trim()).append("</html>").toString();
+		out.add(line.toString().trim());
+		return out;
 	}
 
 	/** the Gain and PB columns at fixed widths (an even split cut "1:25.80" short) */
@@ -1018,6 +1070,7 @@ final class PbPanel extends PluginPanel
 		{
 			body.add(small("<html>Kill times show here from your next kill.</html>", look.dim));
 		}
+		speedTasks(b);
 		rooms(b);
 		body.add(Box.createVerticalStrut(10));
 		JLabel h = new JLabel("Personal bests");
@@ -1150,6 +1203,98 @@ final class PbPanel extends PluginPanel
 			row.add(tl, BorderLayout.EAST);
 			row.setMaximumSize(new Dimension(WIDTH, 20));
 			body.add(row);
+		}
+	}
+
+	private boolean speedTasksOn()
+	{
+		return backend == null || backend.speedTasks();
+	}
+
+	/** "Speed tasks: Master beaten · Grandmaster 4.20s to go" (a list row's tooltip) */
+	private static String speedLine(List<SpeedTasks.Task> tasks, double pb)
+	{
+		SpeedTasks.Task top = SpeedTasks.best(tasks, pb), next = SpeedTasks.next(tasks, pb);
+		return "Speed tasks: " + (top == null ? "none beaten yet" : SpeedTasks.TIERS[top.tier] + " beaten")
+			+ (next != null && pb > 0 ? " · " + SpeedTasks.TIERS[next.tier] + " " + SpeedTasks.gap(pb - next.secs) + " to go" : "");
+	}
+
+	/**
+	 * The Combat Achievement speed tasks of this PB: each tier's time, a tick where the PB beats it, the next one in gold
+	 * and how far off it is (user 2026-11-17: "Yes build that", after the mockup).
+	 */
+	private void speedTasks(History.Boss b)
+	{
+		List<SpeedTasks.Task> tasks = speedTasksOn() ? SpeedTasks.of(b.key) : java.util.Collections.<SpeedTasks.Task>emptyList();
+		if (tasks.isEmpty())
+		{
+			return;
+		}
+		double pb = b.best();
+		SpeedTasks.Task next = SpeedTasks.next(tasks, pb);
+		body.add(Box.createVerticalStrut(10));
+		JLabel h = new JLabel("Speed tasks");
+		h.setFont(FontManager.getRunescapeBoldFont());
+		h.setForeground(look.text);
+		h.setAlignmentX(LEFT_ALIGNMENT);
+		String why = "<html>The Combat Achievement speed tasks for " + b.name + " (times from the OSRS Wiki).<br>"
+			+ "A tick means your PB beats the time. PB History doesn't read which tasks the game gave you,<br>"
+			+ "and some tasks have more rules: hover a row for the task's own words.</html>";
+		h.setToolTipText(why);
+		body.add(h);
+		JLabel sub = small("Combat Achievements", look.dim);
+		sub.setToolTipText(why);
+		body.add(sub);
+		body.add(Box.createVerticalStrut(3));
+		String dim = String.format("#%06x", look.dim.getRGB() & 0xFFFFFF);
+		int i = 0;
+		for (SpeedTasks.Task t : tasks)
+		{
+			boolean done = t.beatenBy(pb);
+			JPanel row = new JPanel(new BorderLayout(6, 0));
+			row.setBackground(i++ % 2 == 1 ? stripe() : look.card);
+			row.setBorder(new EmptyBorder(3, 4, 3, 6));
+			row.setAlignmentX(LEFT_ALIGNMENT);
+			JLabel name = small(t.note.isEmpty() ? SpeedTasks.TIERS[t.tier]
+				: "<html>" + SpeedTasks.TIERS[t.tier] + "<br><font color='" + dim + "'>" + t.note + "</font></html>", look.text);
+			name.setIcon(new SpeedTasks.Chip(t.tier, done && t.sure));
+			name.setIconTextGap(6);
+			row.add(name, BorderLayout.WEST);
+			JLabel time = new JLabel(Times.format(t.secs));
+			time.setFont(FontManager.getRunescapeSmallFont());
+			time.setForeground(done ? look.dim : t == next ? gold() : look.text);
+			time.setHorizontalAlignment(SwingConstants.RIGHT);
+			if (done && t.sure)
+			{
+				time.setIcon(new SpeedTasks.Tick());
+				time.setIconTextGap(5);
+			}
+			else if (done)
+			{
+				time.setText("? " + time.getText());   // beaten at some team size: RuneLite's PB doesn't keep which
+			}
+			row.add(time, BorderLayout.EAST);
+			String yours = pb <= 0 ? "" : "<br>Your PB " + b.time(pb) + (done
+				? (t.sure ? " beats it" : " beats the time, but RuneLite keeps one PB for every team size here,<br>"
+				+ "so PB History can't tell if it was " + t.note)
+				: ": " + SpeedTasks.gap(pb - t.secs) + " to go");
+			row.setToolTipText("<html>" + SpeedTasks.TIERS[t.tier] + ": " + t.text + yours + "</html>");
+			row.setMaximumSize(new Dimension(WIDTH, row.getPreferredSize().height));
+			body.add(row);
+		}
+		JLabel line = null;
+		if (next != null && pb > 0)
+		{
+			line = small("Next: " + SpeedTasks.TIERS[next.tier] + ", " + SpeedTasks.gap(pb - next.secs) + " to go", gold());
+		}
+		else if (next == null && tasks.stream().allMatch(t -> t.sure))   // a "?" tier left: not "every"
+		{
+			line = small("Your PB beats every tier", new Color(0x4FD16A));
+		}
+		if (line != null)
+		{
+			body.add(Box.createVerticalStrut(4));
+			body.add(line);
 		}
 	}
 

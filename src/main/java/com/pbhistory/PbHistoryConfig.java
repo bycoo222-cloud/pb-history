@@ -76,4 +76,30 @@ public interface PbHistoryConfig extends Config
 	{
 		return Theme.PLAIN;
 	}
+
+	// user 2026-11-17, after the mockup of both: "Yes build that"
+	@ConfigItem(
+		position = 1,
+		keyName = "speedTasks",
+		name = "Speed tasks",
+		description = "Combat Achievement speed tasks: a badge after each boss with the hardest tier your PB beats "
+			+ "(hollow = none yet), and every tier's time on the boss's page. The times are the OSRS Wiki's; a tick means "
+			+ "your PB beats the time, not that the game gave you the task"
+	)
+	default boolean speedTasks()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		position = 2,
+		keyName = "killLine",
+		name = "Line after each kill",
+		description = "A chat line after each timed boss kill, raid or challenge: how far off your PB it was, where it "
+			+ "ranks among your kills and your average; after a new PB, by how much and how far the next speed task is"
+	)
+	default boolean killLine()
+	{
+		return true;
+	}
 }

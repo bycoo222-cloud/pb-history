@@ -15,6 +15,13 @@ and challenge.
   sizes, and has a tab for **The Fractured Archive** (one PB for every team size, as RuneLite's `!pb` keeps it).
 - **Click a boss** for its graph: every timed kill as a dot, your PB as a line stepping down, and a mark where each
   new PB was set. Below it: your average and your last-10 average, and every PB you set with its date and kill count.
+- **Combat Achievement speed tasks.** A badge after each boss shows the hardest speed-task tier your PB beats (H, E, M,
+  GM; hollow = none yet), and the boss's page lists every tier's time with a tick where your PB beats it and how far
+  off the next one is. Raids go by team size and mode, like the game's tasks. The times are the OSRS Wiki's; a tick
+  means your PB beats the time, not that the game gave you the task (some tasks have more rules, like no slayer task).
+- **A chat line after each kill** (bosses, raids, challenges): how far off your PB it was, where it ranks among your
+  kills, and your average. After a new PB: by how much, and how far the next speed task is. *Line after each kill* in
+  the settings turns it off.
 - **Goal times.** Set a goal on a boss's page: a bar shows how close your PB is, and a chat line says *goal reached!*
   on the kill that beats it.
 - **How consistent you are**: how many of your kills came within 5% of your PB, and your typical kill.
@@ -40,6 +47,8 @@ settings and never changes them. Everything stays on your computer; it makes no 
 
 Which new screenshot is a boss kill (its boss and kill count, from the game event that made RuneLite take it) follows RuneLite's own
 Screenshot plugin (`ScreenshotPlugin`, Copyright (c) 2018, Lotto), used under RuneLite's BSD 2-Clause licence.
+
+The Combat Achievement speed-task times come from the Old School RuneScape Wiki's Combat Achievements tables.
 
 ## Feedback
 

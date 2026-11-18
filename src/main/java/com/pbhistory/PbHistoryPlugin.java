@@ -294,7 +294,9 @@ public class PbHistoryPlugin extends Plugin implements PbPanel.Backend
 		if (boss != null)
 		{
 			int kc = Math.abs(kcTick - pendingTick) <= WINDOW ? kcValue : 0;
-			record(Entry.kill(boss, pendingSecs, System.currentTimeMillis(), kc));
+			double secs = pendingSecs;
+			record(Entry.kill(boss, secs, System.currentTimeMillis(), kc));
+			killLine(boss, secs, Math.abs(pbTick - pendingTick) <= WINDOW && boss.equals(pbBoss));
 			pendingTick = -1;
 			if (History.RAIDS.equals(History.tab(boss)) && !runRooms.isEmpty())
 			{
@@ -313,6 +315,57 @@ public class PbHistoryPlugin extends Plugin implements PbPanel.Backend
 		{
 			pendingTick = -1;   // a time with no kill count saved for it (e.g. Chat Commands is off)
 			pendingTotal = 0;
+		}
+	}
+
+	/**
+	 * The chat line after a timed kill ({@link KillLine}): bosses, raids and challenges only (a line after every agility
+	 * lap or Tempoross game would be noise). {@code newPb}: RuneLite saved a new PB for {@code boss} with this kill.
+	 */
+	private void killLine(String boss, double secs, boolean newPb)
+	{
+		if (!config.killLine() || History.OTHER.equals(History.tab(boss)))
+		{
+			return;
+		}
+		String text = null;
+		if (newPb)
+		{
+			Entry pb = null;
+			for (Entry e : lines)
+			{
+				if (e.isPb() && boss.equals(e.boss) && (pb == null || e.at >= pb.at))
+				{
+					pb = e;
+				}
+			}
+			if (pb != null)
+			{
+				text = KillLine.pb(pb.secs, pb.was, SpeedTasks.of(boss));
+			}
+		}
+		else
+		{
+			List<Double> times = new ArrayList<>();
+			for (Entry e : lines)
+			{
+				if (!e.isPb() && !e.isRoom() && boss.equals(e.boss))
+				{
+					times.add(e.secs);
+				}
+			}
+			double[] t = new double[times.size()];
+			for (int i = 0; i < t.length; i++)
+			{
+				t[i] = times.get(i);
+			}
+			text = KillLine.kill(secs, parseDouble(configManager.getRSProfileConfiguration(PB_GROUP, boss)), t);
+		}
+		if (text != null)
+		{
+			ChatMessageBuilder b = new ChatMessageBuilder().append(ChatColorType.HIGHLIGHT).append("PB History")
+				.append(ChatColorType.NORMAL).append(" - " + text);
+			chatMessageManager.queue(QueuedMessage.builder().type(ChatMessageType.CONSOLE).runeLiteFormattedMessage(b.build()).build());
 		}
 	}
 
@@ -365,6 +418,11 @@ public class PbHistoryPlugin extends Plugin implements PbPanel.Backend
 			PbPanel p = panel;
 			PbHistoryConfig.Theme s = config.theme();
 			SwingUtilities.invokeLater(() -> p.setTheme(s));
+			return;
+		}
+		if (GROUP.equals(e.getGroup()) && "speedTasks".equals(e.getKey()))
+		{
+			refresh();   // the badges and the boss page's table come and go
 			return;
 		}
 		boolean pb = PB_GROUP.equals(e.getGroup());
@@ -803,8 +861,15 @@ public class PbHistoryPlugin extends Plugin implements PbPanel.Backend
 
 	/** What's new after an update, shown until closed (change BOTH with each update worth telling). */
 	static final String WHATS_NEW_ID = "2026-11-goals";
-	static final String WHATS_NEW = "New: each PB's kill screenshot; goal times, consistency and raid room times (open "
-		+ "a boss); The Fractured Archive on the Raids tab; themes in the settings.";
+	static final String WHATS_NEW = "New: Combat Achievement speed tasks on every boss, and a chat line after each kill; "
+		+ "each PB's kill screenshot; goal times, consistency and raid room times (open a boss); The Fractured Archive on "
+		+ "the Raids tab; themes in the settings.";
+
+	@Override
+	public boolean speedTasks()
+	{
+		return config.speedTasks();
+	}
 
 	@Override
 	public String whatsNew()
